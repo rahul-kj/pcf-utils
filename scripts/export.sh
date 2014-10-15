@@ -1,0 +1,215 @@
+#!/bin/bash
+
+function init()
+{
+export PATH=/usr/local/rvm/gems/ruby-2.1.2/bin:/usr/local/rvm/gems/ruby-2.1.2@global/bin:/usr/local/rvm/rubies/ruby-2.1.2/bin:/usr/lib64/qt-3.3/bin:/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/usr/local/rvm/bin:/home/boshdirector/bin
+export PG_HOME=/usr/pgsql-9.0
+export LD_LIBRARY_PATH=:/usr/pgsql-9.0/lib
+export GEM_PATH=/usr/local/rvm/gems/ruby-2.1.2:/usr/local/rvm/gems/ruby-2.1.2@global
+export GEM_HOME=/usr/local/rvm/gems/ruby-2.1.2
+export IRBRC=/usr/local/rvm/rubies/ruby-2.1.2/.irbrc
+export MY_RUBY_HOME=/usr/local/rvm/rubies/ruby-2.1.2
+export rvm_path=/usr/local/rvm
+export rvm_prefix=/usr/local
+
+
+	DIRECTORIP=10.15.76.101
+	DIRECTORUSER=director
+	DIRECTORPASS=e72c324eea1a7887ebbe
+
+	NFSIP=10.15.76.109
+	NFSUSER=vcap
+	NFSPASS=77941371dd331b88
+
+#Assumes you are in scripts directory under the HOME directory of the user
+
+	DIR=`pwd`
+#	echo $DIR
+
+	DATE=`date +%Y_%m_%d`
+#	echo $DATE
+
+	BACKUPDATADIR=/data/backups
+#	echo $BACKUPDATADIR
+
+#	echo $DIRECTORIP
+}
+
+function dir_create()
+{
+	CURBACKUPDIR=$BACKUPDATADIR/$DATE
+
+	echo $CURBACKUPDIR
+
+	if [ ! -d $CURBACKUPDIR ]
+	then
+		mkdir $CURBACKUPDIR
+	fi
+
+}
+
+function lines()
+{
+
+        echo "Arg 1 (name):" . $1
+        value=`grep -A1 "$1" section-lines.temp | cut -d ':' -f1 | tr '[:space:]' ',' | sed -n 's/,$//p'`
+        # Assume you only retrieve 2 lines
+
+	arraystring=${value}p
+	echo $arraystring
+	sed -n "$arraystring" < $DIR/cf-backups-jobs.yml > $DIR/$1.temp
+
+}
+
+
+function db_dump()
+{
+
+	# Get the username:
+	pguser=`grep -A4 "roles:$" $DIR/$1.temp | grep "name" | cut -d ':' -f2 | sed -n 's/^ //p'`
+#	echo "Username from db_dump is: $pguser"
+	PGPASSWORD=`grep -A4 "roles:$" $DIR/$1.temp | grep "password" | cut -d ':' -f2 | sed -n 's/^ //p'`
+#	echo "PGPASS = $PGPASSWORD "
+	export PGPASSWORD
+	pgport=`grep -A4 "$1:" $DIR/$1.temp | grep "port" | cut -d ':' -f2 | sed -n 's/^ //p'`
+#	echo "PGPORT = $pgport"
+	pghost=`grep -A4 "$1:" $DIR/$1.temp | grep "address" | cut -d ':' -f2 | sed -n 's/^ //p'`
+#	echo "pghost= $pghost"
+	pgdb=`grep -A4 "databases:$" $DIR/$1.temp | grep "name" | cut -d ':' -f2 | sed -n 's/^ //p'`
+	echo "pgdb= $pgdb"
+
+
+	pg_dump -h $pghost -U $pguser -p $pgport $pgdb > $CURBACKUPDIR/$1_$DATE.sql
+
+	unset PGPASSWORD
+}
+
+function cleanup()
+{
+	rm $DIR/*.temp
+
+	if [ -f $DIR/cf-backups-temp.yml ]
+	then
+        	rm $DIR/cf-backups-temp.yml
+	fi
+
+	if [ -f $DIR/../.bosh_config ]
+	then
+		rm $DIR/../.bosh_config
+	fi
+	if [ -f $DIR/cf-backups-jobs.yml ]
+	then
+        	rm $DIR/cf-backups-jobs.yml
+	fi
+
+	if [ -f $DIR/cf-backups.yml ]
+	then
+        	rm $DIR/cf-backups.yml
+	fi
+
+}
+
+function director_login()
+{
+	bosh target $DIRECTORIP << EOF
+	$DIRECTORUSER
+	$DIRECTORPASS
+EOF
+
+	value=`bosh deployments | grep cf- | grep -v cf-metrics | grep -v cf-mysql | tr -s ' ' | cut -d '|' -f 2`
+#	echo $value
+
+	if [ -f $DIR/cf-backups.yml ]
+	then
+        	rm $DIR/cf-backups.yml
+	fi
+
+
+	bosh download manifest $value $DIR/cf-backups.yml
+}
+
+function section_headers()
+{
+	sed '1,/^jobs/d' $DIR/cf-backups.yml > $DIR/cf-backups-jobs.yml
+
+# Split out CCDB information
+
+	grep -n "^- name: " $DIR/cf-backups-jobs.yml > $DIR/section-lines.temp
+}
+
+function copy_manifest()
+{
+
+	cp $DIR/cf-backups.yml $CURBACKUPDIR/cf-manifest-$DATE.yml
+
+}
+
+function retrieve_nfsshare()
+{
+LOCATION=/var/vcap/store/shared
+SHAREDIR=$CURBACKUPDIR/nfs_share
+
+if [ ! -d $SHAREDIR ]
+then
+	mkdir -p $SHAREDIR
+fi
+
+/usr/bin/expect -c "
+set timeout -1
+spawn /usr/bin/scp -rp $NFSUSER@$NFSIP:/var/vcap/store/shared $SHAREDIR
+expect {
+        "*assword" { send $NFSPASS\r }
+        }
+expect eof
+"
+
+cd $SHAREDIR
+
+if [ -f ../nfsshare-$DATE.tar ]
+then
+	rm ../nfsshare-$DATE.tar
+fi
+
+	tar -cvf ../nfsshare-$DATE.tar shared
+	
+#if [ -f ../nfsshare-$DATE.tar.gz ]
+#then
+#	rm ../nfsshare-$DATE.tar.gz
+#fi
+
+#	gzip ../nfsshare-$DATE.tar
+
+if [ -d $SHAREDIR ]
+then
+        rm -rf $SHAREDIR
+fi
+}
+
+
+init
+
+dir_create
+
+#if false
+#then
+
+director_login
+
+section_headers
+
+
+lines ccdb
+lines uaadb
+lines consoledb
+
+db_dump ccdb
+db_dump uaadb
+db_dump consoledb
+
+copy_manifest
+
+#fi
+
+retrieve_nfsshare
+
+cleanup
