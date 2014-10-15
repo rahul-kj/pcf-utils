@@ -59,7 +59,7 @@ fetch_bosh_connection_parameters() {
 
 bosh_login() {
 	echo "BOSH LOGIN"
-	rn -rf ~/.bosh_config
+	rm -rf ~/.bosh_config
 	
 	bosh target $BOSH_DIRECTOR_IP << EOF
 	$DIRECTOR_USERNAME
