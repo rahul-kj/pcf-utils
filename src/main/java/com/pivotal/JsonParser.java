@@ -33,7 +33,56 @@ public class JsonParser {
 
 		JsonObject obj = rdr.readObject();
 
+		String infrastructure_type = obj.getJsonObject("infrastructure").getString("type");
+
+		if (infrastructure_type.equalsIgnoreCase(CloudEnv.VCLOUD.getValue())) {
+			details = vCloudEnv(fieldName, jobType, username, details, obj);
+		} else if (infrastructure_type.equalsIgnoreCase(CloudEnv.VSPHERE.getValue())) {
+			details = vsphereEnv(fieldName, jobType, username, details, obj);
+		}
+
+		return details;
+	}
+
+	private String vsphereEnv(String fieldName, String jobType, String username, String details, JsonObject obj) {
 		JsonArray jsonArray = obj.getJsonArray("products");
+
+		for (JsonObject result : jsonArray.getValuesAs(JsonObject.class)) {
+			if (result.getString("type").equalsIgnoreCase(fieldName)) {
+				JsonArray jobs = result.getJsonArray("jobs");
+				for (JsonObject job : jobs.getValuesAs(JsonObject.class)) {
+					if (job.getString("type").equalsIgnoreCase(jobType)) {
+						JsonArray properties = job.getJsonArray("properties");
+						for (JsonObject property : properties.getValuesAs(JsonObject.class)) {
+							if (property.getJsonObject("value").getString("identity").equalsIgnoreCase(username)) {
+								details += "|" + property.getJsonObject("value").getString("password");
+								break;
+							}
+						}
+					}
+				}
+
+				JsonObject ips = result.getJsonObject("ips");
+				Set<String> keys = ips.keySet();
+				for (String key : keys) {
+					if (key.contains(jobType)) {
+						if (ips.getJsonArray(key).toArray().length == 1) {
+							details += "|" + ips.getJsonArray(key).get(0).toString().replaceAll("\"", "");
+							break;
+						}
+					}
+				}
+			}
+		}
+		return details;
+	}
+
+	private String vCloudEnv(String fieldName, String jobType, String username, String details, JsonObject obj) {
+		JsonArray jsonArray = obj.getJsonArray("components");
+		
+		if(fieldName.equalsIgnoreCase("microbosh")) {
+			fieldName = "microbosh-vcloud";
+		}
 
 		for (JsonObject result : jsonArray.getValuesAs(JsonObject.class)) {
 			if (result.getString("type").equalsIgnoreCase(fieldName)) {
