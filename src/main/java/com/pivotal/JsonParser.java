@@ -2,6 +2,8 @@ package com.pivotal;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.util.Set;
 
 import javax.json.Json;
@@ -22,18 +24,17 @@ public class JsonParser {
 		System.out.println(value);
 	}
 
-	private String getValue(String fileName, String fieldName, String jobType, String username) throws Exception {
+	String getValue(String fileName, String fieldName, String jobType, String username) throws Exception {
 		String details = username;
 
-		File file = new File(fileName);
-
-		FileInputStream fis = new FileInputStream(file);
+		InputStream fis = getFileStream(fileName);
 
 		JsonReader rdr = Json.createReader(fis);
 
 		JsonObject obj = rdr.readObject();
 
-		String infrastructure_type = obj.getJsonObject("infrastructure").getString("type");
+		String infrastructure_type = obj.getJsonObject(ApplicationConstant.INFRASTRUTURE).getString(
+				ApplicationConstant.TYPE);
 
 		if (infrastructure_type.equalsIgnoreCase(CloudEnv.VCLOUD.getValue())) {
 			details = vCloudEnv(fieldName, jobType, username, details, obj);
@@ -45,61 +46,43 @@ public class JsonParser {
 	}
 
 	private String vsphereEnv(String fieldName, String jobType, String username, String details, JsonObject obj) {
-		JsonArray jsonArray = obj.getJsonArray("products");
+		JsonArray jsonArray = obj.getJsonArray(ApplicationConstant.PRODUCTS);
 
-		for (JsonObject result : jsonArray.getValuesAs(JsonObject.class)) {
-			if (result.getString("type").equalsIgnoreCase(fieldName)) {
-				JsonArray jobs = result.getJsonArray("jobs");
-				for (JsonObject job : jobs.getValuesAs(JsonObject.class)) {
-					if (job.getString("type").equalsIgnoreCase(jobType)) {
-						JsonArray properties = job.getJsonArray("properties");
-						for (JsonObject property : properties.getValuesAs(JsonObject.class)) {
-							if (property.getJsonObject("value").getString("identity").equalsIgnoreCase(username)) {
-								details += "|" + property.getJsonObject("value").getString("password");
-								break;
-							}
-						}
-					}
-				}
-
-				JsonObject ips = result.getJsonObject("ips");
-				Set<String> keys = ips.keySet();
-				for (String key : keys) {
-					if (key.contains(jobType)) {
-						if (ips.getJsonArray(key).toArray().length == 1) {
-							details += "|" + ips.getJsonArray(key).get(0).toString().replaceAll("\"", "");
-							break;
-						}
-					}
-				}
-			}
-		}
+		details = getInfo(fieldName, jobType, username, details, jsonArray);
 		return details;
 	}
 
 	private String vCloudEnv(String fieldName, String jobType, String username, String details, JsonObject obj) {
-		JsonArray jsonArray = obj.getJsonArray("components");
-		
-		if(fieldName.equalsIgnoreCase("microbosh")) {
-			fieldName = "microbosh-vcloud";
+		JsonArray jsonArray = obj.getJsonArray(ApplicationConstant.COMPONENTS);
+
+		if (fieldName.equalsIgnoreCase(ApplicationConstant.MICROBOSH)) {
+			fieldName = ApplicationConstant.MICROBOSH_VCLOUD;
 		}
 
+		details = getInfo(fieldName, jobType, username, details, jsonArray);
+		return details;
+	}
+
+	private String getInfo(String fieldName, String jobType, String username, String details, JsonArray jsonArray) {
 		for (JsonObject result : jsonArray.getValuesAs(JsonObject.class)) {
-			if (result.getString("type").equalsIgnoreCase(fieldName)) {
-				JsonArray jobs = result.getJsonArray("jobs");
+			if (result.getString(ApplicationConstant.TYPE).equalsIgnoreCase(fieldName)) {
+				JsonArray jobs = result.getJsonArray(ApplicationConstant.JOBS);
 				for (JsonObject job : jobs.getValuesAs(JsonObject.class)) {
-					if (job.getString("type").equalsIgnoreCase(jobType)) {
-						JsonArray properties = job.getJsonArray("properties");
+					if (job.getString(ApplicationConstant.TYPE).equalsIgnoreCase(jobType)) {
+						JsonArray properties = job.getJsonArray(ApplicationConstant.PROPERTIES);
 						for (JsonObject property : properties.getValuesAs(JsonObject.class)) {
-							if (property.getJsonObject("value").getString("identity").equalsIgnoreCase(username)) {
-								details += "|" + property.getJsonObject("value").getString("password");
+							if (property.getJsonObject(ApplicationConstant.VALUE)
+									.getString(ApplicationConstant.IDENTITY).equalsIgnoreCase(username)) {
+								details += "|"
+										+ property.getJsonObject(ApplicationConstant.VALUE).getString(
+												ApplicationConstant.PASSWORD);
 								break;
 							}
 						}
 					}
 				}
 
-				JsonObject ips = result.getJsonObject("ips");
+				JsonObject ips = result.getJsonObject(ApplicationConstant.IPS);
 				Set<String> keys = ips.keySet();
 				for (String key : keys) {
 					if (key.contains(jobType)) {
@@ -113,4 +96,11 @@ public class JsonParser {
 		}
 		return details;
 	}
+
+	InputStream getFileStream(String fileName) throws FileNotFoundException {
+		File file = new File(fileName);
+		FileInputStream fis = new FileInputStream(file);
+		return fis;
+	}
+
 }
