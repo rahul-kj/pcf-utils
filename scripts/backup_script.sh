@@ -1,5 +1,27 @@
 #!/bin/bash --login
 
+validate_software() {
+	echo "VALIDATE MANDATORY TOOLS"
+	
+	INSTALLED_BOSH=`which bosh`
+	if [ -z "$INSTALLED_BOSH" ]; then
+		echo "BOSH CLI not installed"
+		exit 1
+	fi
+	
+	INSTALLED_PG_DUMP=`which pg_dump`
+	if [ -z "$INSTALLED_PG_DUMP" ]; then
+		echo "pg_dump utility not installed"
+		exit 1
+	fi
+	
+	INSTALLED_JAVA=`which java`
+	if [ -z "$INSTALLED_JAVA" ]; then
+		echo "Java JRE is missing"
+		exit 1
+	fi
+}
+
 copy_deployment_files() {
 
 	echo "COPY DEPLOYMENT MANIFEST"
@@ -163,14 +185,17 @@ export_nfs_server() {
 }
 
 export_installation() {
-	CONNECTION_URL=https://$OPS_MANAGER_HOST/api/installation_asset_collection
+	if [[ "Y" = "$COMPLETE_BACKUP" || "y" = "$COMPLETE_BACKUP" ]]; then
+		CONNECTION_URL=https://$OPS_MANAGER_HOST/api/installation_asset_collection
 	
-	echo "EXPORT INSTALLATION FILES FROM " $CONNECTION_URL
+		echo "EXPORT INSTALLATION FILES FROM " $CONNECTION_URL
 	
-	curl "$CONNECTION_URL" -X GET -u $OPS_MGR_ADMIN_USERNAME:$OPS_MGR_ADMIN_PASSWORD --insecure -k -o $WORK_DIR/installation.zip
+		curl "$CONNECTION_URL" -X GET -u $OPS_MGR_ADMIN_USERNAME:$OPS_MGR_ADMIN_PASSWORD --insecure -k -o $WORK_DIR/installation.zip
+	fi	
 }
 
 execute() {
+	validate_software
 	copy_deployment_files
 	export_Encryption_key
 	export_installation_settings
@@ -186,8 +211,14 @@ execute() {
 	export_installation
 }
 
-if [ $# -ne 5 ]; then
-	echo "Usage: ./backup_script.sh <OPS MGR HOST or IP> <SSH PASSWORD> <Admin USER> <ADMIN PASSWORD> <OUTPUT DIR>"
+if [ $# -lt 5 ]; then
+	echo "Usage: ./backup_script.sh <OPS MGR HOST or IP> <SSH PASSWORD> <OPS MGR ADMIN USER> <OPS MGR ADMIN PASSWORD> <OUTPUT DIR> <COMPLETE BACKUP>"
+	printf "\t %s \t\t\t %s \n" "OPS MGR HOST or IP:" "OPS Manager Host or IP"
+	printf "\t %s \t\t\t\t %s \n" "SSH PASSWORD:" "OPS Manager Tempest SSH Password"
+	printf "\t %s \t\t\t %s \n" "OPS MGR ADMIN USER:" "OPS Manager Admin Username"
+	printf "\t %s \t\t %s \n" "OPS MGR ADMIN PASSWORD:" "OPS Manager Admin Password"
+	printf "\t %s \t\t\t\t %s \n" "OUTPUT DIR:" "Backup Directory"				
+	printf "\t %s \t\t\t %s \n" "COMPLETE BACKUP:" "Specify 'Y' for complete backup"					
 	exit 1
 fi
 
@@ -201,6 +232,8 @@ export WORK_DIR=$5/backup-$DATE
 export NFS_DIR=$WORK_DIR/nfs_share
 export DEPLOYMENT_DIR=$WORK_DIR/deployments
 export DATABASE_DIR=$WORK_DIR/database
+
+export COMPLETE_BACKUP=$6
 
 mkdir -p $WORK_DIR
 mkdir -p $NFS_DIR
