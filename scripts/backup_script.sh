@@ -30,11 +30,22 @@ copy_deployment_files() {
 
 		spawn scp tempest@$OPS_MANAGER_HOST:/var/tempest/workspaces/default/deployments/*.yml $DEPLOYMENT_DIR
 
-		expect "*password:"
-
-		send $OPS_MGR_SSH_PASSWORD\r
-	
-		expect "success" { interact }
+		expect { 
+			-re ".*Are.*.*yes.*no.*" { 
+				send yes\r ; 
+				exp_continue
+			}
+			
+			"*?assword:*" { 
+				send $OPS_MGR_SSH_PASSWORD\r 
+			}
+		}
+		expect {
+			"*?assword:*" { 
+				send $OPS_MGR_SSH_PASSWORD\r 
+				interact
+			}
+		}
 		
 		exit
 	"
@@ -45,11 +56,22 @@ copy_deployment_files() {
 
 		spawn scp tempest@$OPS_MANAGER_HOST:/var/tempest/workspaces/default/deployments/micro/*.yml $DEPLOYMENT_DIR
 
-		expect "*password:"
-
-		send $OPS_MGR_SSH_PASSWORD\r
-	
-		expect "success" { interact }
+		expect { 
+			-re ".*Are.*.*yes.*no.*" { 
+				send yes\r ; 
+				exp_continue
+			}
+			
+			"*?assword:*" { 
+				send $OPS_MGR_SSH_PASSWORD\r 
+			}
+		}
+		expect {
+			"*?assword:*" { 
+				send $OPS_MGR_SSH_PASSWORD\r 
+				interact
+			}
+		}
 		
 		exit
 	"
@@ -127,6 +149,38 @@ set_bosh_deployment() {
 	bosh deployment $WORK_DIR/$CF_DEPLOYMENT_FILE_NAME
 }
 
+export_bosh_vms() {
+    echo "EXPORT BOSH VMS"
+	OUTPUT=`bosh vms | grep "cloud_controller-*" | cut -d '|' -f 2 | tr -d ' '`
+	echo $OUTPUT > $WORK_DIR/bosh-vms.txt
+}
+
+stop_cloud_controller() {
+	echo "STOPPING CLOUD CONTROLLER"
+	OUTPUT=`cat $WORK_DIR/bosh-vms.txt`
+	
+	for word in $OUTPUT
+	do
+		JOB=`echo $word | cut -d '/' -f 1`
+		INDEX=`echo $word | cut -d '/' -f 2`
+
+		/usr/bin/expect -c "
+			set timeout -1
+			
+			spawn bosh stop $JOB $INDEX
+
+			expect { 
+				-re ".*continue.*" { 
+					send yes\r ; 
+					interact
+				}
+			}
+		
+			exit
+		"
+	done
+}
+
 export_cc_db() {
 	echo "EXPORT CCDB"
 	
@@ -173,15 +227,55 @@ export_nfs_server() {
 	
 	/usr/bin/expect -c "
 		set timeout -1
-	
+		
 		spawn scp -rp $NFS_SERVER_USER@$NFS_IP:/var/vcap/store/shared $NFS_DIR
+		
+		expect { 
+			-re ".*Are.*.*yes.*no.*" { 
+				send yes\r ; 
+				exp_continue
+			}
+			
+			"*?assword:*" { 
+				send $NFS_SERVER_PASSWORD\r 
+			}
+		}
+		expect {
+			"*?assword:*" { 
+				send $NFS_SERVER_PASSWORD\r 
+				interact
+			}
+		}
 	
-		expect "*assword"
-	
-		send $NFS_SERVER_PASSWORD\r
-	
-		expect eof
+		exit
 	"
+}
+
+start_cloud_controller() {
+	echo "STARTING CLOUD CONTROLLER"
+	OUTPUT=`cat $WORK_DIR/bosh-vms.txt`
+	
+	for word in $OUTPUT
+	do
+		JOB=`echo $word | cut -d '/' -f 1`
+		INDEX=`echo $word | cut -d '/' -f 2`
+
+		/usr/bin/expect -c "
+			set timeout -1
+			
+			spawn bosh start $JOB $INDEX
+
+			expect { 
+				-re ".*continue.*" { 
+					send yes\r ; 
+					interact
+				}
+			}
+		
+			exit
+		"
+	done
+
 }
 
 export_installation() {
@@ -204,10 +298,13 @@ execute() {
 	verify_deployment_backedUp
 	bosh_status
 	set_bosh_deployment
+	export_bosh_vms
+	stop_cloud_controller
 	export_cc_db
 	export_uaadb
 	export_consoledb
 	export_nfs_server
+	start_cloud_controller
 	export_installation
 }
 
