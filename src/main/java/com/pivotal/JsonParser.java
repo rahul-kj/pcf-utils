@@ -86,7 +86,7 @@ public class JsonParser {
 				Set<String> keys = ips.keySet();
 				for (String key : keys) {
 					if (key.contains(jobType)) {
-						if (ips.getJsonArray(key).toArray().length == 1) {
+						if (ips.getJsonArray(key).toArray().length >= 1) {
 							details += "|" + ips.getJsonArray(key).get(0).toString().replaceAll("\"", "");
 							break;
 						}
