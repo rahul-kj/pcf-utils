@@ -20,6 +20,12 @@ validate_software() {
 		echo "Java JRE is missing"
 		exit 1
 	fi
+	
+	INSTALLED_MYSQL=`which mysqldump`
+	if [ -z "$INSTALLED_MYSQL" ]; then
+		echo "mysqldump utility is missing"
+		exit 1
+	fi
 }
 
 copy_deployment_files() {
@@ -278,6 +284,25 @@ start_cloud_controller() {
 
 }
 
+export_mysqldb() {
+	output=`sh appassembler/bin/app $WORK_DIR/installation.yml cf mysql root`
+	
+	export USERNAME=`echo $output | cut -d '|' -f 1`
+	export PASSWORD=`echo $output | cut -d '|' -f 2`
+	export IP=`echo $output | cut -d '|' -f 3`
+
+	DB_FILE=$DATABASE_DIR/user_databases.sql
+
+	echo '[mysqldump]
+user='$USERNAME'
+password='$PASSWORD > ~/.my.cnf
+
+	echo "EXPORT MySQL DB"
+
+	mysqldump -u $USERNAME -h $IP --all-databases > $DB_FILE
+
+}
+
 export_installation() {
 	if [[ "Y" = "$COMPLETE_BACKUP" || "y" = "$COMPLETE_BACKUP" ]]; then
 		CONNECTION_URL=https://$OPS_MANAGER_HOST/api/installation_asset_collection
@@ -305,6 +330,7 @@ execute() {
 	export_consoledb
 	export_nfs_server
 	start_cloud_controller
+	export_mysqldb
 	export_installation
 }
 
@@ -325,7 +351,7 @@ export OPS_MGR_SSH_PASSWORD=$2
 export OPS_MGR_ADMIN_USERNAME=$3
 export OPS_MGR_ADMIN_PASSWORD=$4
 
-export WORK_DIR=$5/backup-$DATE
+export WORK_DIR=$5/Backup_$DATE
 export NFS_DIR=$WORK_DIR/nfs_share
 export DEPLOYMENT_DIR=$WORK_DIR/deployments
 export DATABASE_DIR=$WORK_DIR/database
