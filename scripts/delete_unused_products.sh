@@ -4,8 +4,6 @@ remove_unused_products() {
 	echo "REMOVING USUSED PRODUCTS"
 	CONNECTION_URL=https://$OPS_MANAGER_HOST/api/products
 
-	echo "Hitting the $CONNECTION_URL"
-
 	curl "$CONNECTION_URL" -d '' -X DELETE --insecure -k -u $OPS_MGR_ADMIN_USERNAME:$OPS_MGR_ADMIN_PASSWORD
 }
 
