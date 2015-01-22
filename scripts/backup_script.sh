@@ -229,6 +229,14 @@ export_installation() {
 	fi
 }
 
+zip_all_together() {
+	cd $WORK_DIR
+	cd ..
+	cmd=`tar -zcvf $WORK_DIR.tar.gz $WORK_DIR`
+	echo "Compressed the backup into $WORK_DIR.tar.gz"
+	cmd=`rm -rf $WORK_DIR`
+}
+
 execute() {
 	validate_software
 	copy_deployment_files
@@ -248,6 +256,7 @@ execute() {
 	start_cloud_controller
 	export_mysqldb
 	export_installation
+	zip_all_together
 }
 
 if [ $# -lt 5 ]; then
