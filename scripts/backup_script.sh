@@ -232,8 +232,8 @@ export_installation() {
 zip_all_together() {
 	cd $WORK_DIR
 	cd ..
-	cmd=`tar -zcvf $WORK_DIR.tar.gz $WORK_DIR`
-	echo "Compressed the backup into $WORK_DIR.tar.gz"
+	cmd=`tar -zcvf $BACKUP_DIR_NAME.tar.gz $BACKUP_DIR_NAME`
+	echo "Compressed the backup into $BACKUP_DIR_NAME.tar.gz"
 	cmd=`rm -rf $WORK_DIR`
 }
 
@@ -275,8 +275,8 @@ export OPS_MANAGER_HOST=$1
 export OPS_MGR_SSH_PASSWORD=$2
 export OPS_MGR_ADMIN_USERNAME=$3
 export OPS_MGR_ADMIN_PASSWORD=$4
-
-export WORK_DIR=$5/Backup_$DATE
+export BACKUP_DIR_NAME=Backup_$DATE
+export WORK_DIR=$5/$BACKUP_DIR_NAME
 export NFS_DIR=$WORK_DIR/nfs_share
 export DEPLOYMENT_DIR=$WORK_DIR/deployments
 export DATABASE_DIR=$WORK_DIR/database
