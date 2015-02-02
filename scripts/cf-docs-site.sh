@@ -1,11 +1,11 @@
 #!/bin/bash
 
 git_clone_update() {
-	if [ ! -d $1 ]; then
-		git clone https://github.com/cloudfoundry/$1
+	if [ ! -d $WORK_DIR/$1 ]; then
+		git clone https://github.com/cloudfoundry/$1 $WORK_DIR/$1
 	fi
-	
-	cd $1	
+
+	cd $WORK_DIR/$1
 	git pull
 }
 
@@ -33,5 +33,11 @@ git_clone_update docs-running-cf
 git_clone_update docs-buildpacks
 
 cd $WORK_DIR/docs-book-cloudfoundry
+bundle install
+bundle exec bookbinder publish local
+
 rm -rf final_app/Gemfile.lock
-./run.sh
+rm -rf final_app/Gemfile
+
+cd final_app
+ruby app.rb
