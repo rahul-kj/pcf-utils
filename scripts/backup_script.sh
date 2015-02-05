@@ -30,11 +30,6 @@ validate_software() {
 	fi
 }
 
-export_Encryption_key() {
-	echo "EXPORT DB ENCRYPTION KEY"
-	grep -E 'db_encryption_key' $DEPLOYMENT_DIR/cf-*.yml | cut -d ':' -f 2 | sort -u > $WORK_DIR/cc_db_encryption_key.txt
-}
-
 verify_deployment_backedUp() {
 	echo "VERIFY CF DEPLOYMENT MANIFEST"
 	export CF_DEPLOYMENT_NAME=`bosh deployments | grep "cf-" | cut -d '|' -f 2 | tr -s ' ' | grep "cf-" | tr -d ' '`
@@ -48,6 +43,11 @@ verify_deployment_backedUp() {
 		echo "file does not exist"
 		bosh download manifest $CF_DEPLOYMENT_NAME $WORK_DIR/$CF_DEPLOYMENT_FILE_NAME
 	fi
+}
+
+export_Encryption_key() {
+	echo "EXPORT DB ENCRYPTION KEY"
+	grep -E 'db_encryption_key' $WORK_DIR/$CF_DEPLOYMENT_FILE_NAME | cut -d ':' -f 2 | sort -u > $WORK_DIR/cc_db_encryption_key.txt
 }
 
 bosh_status() {
@@ -240,11 +240,11 @@ zip_all_together() {
 execute() {
 	validate_software
 	copy_deployment_files
-	export_Encryption_key
 	export_installation_settings
 	fetch_bosh_connection_parameters
 	bosh_login
 	verify_deployment_backedUp
+	export_Encryption_key
 	bosh_status
 	set_bosh_deployment
 	export_bosh_vms
