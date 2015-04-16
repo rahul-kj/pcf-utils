@@ -2,7 +2,7 @@ package com.pivotal;
 
 public interface ApplicationConstant {
 	String INFRASTRUTURE = "infrastructure";
-	String TYPE = "type";
+	String TYPE = "identifier";
 	String VALUE = "value";
 	String IDENTITY = "identity";
 	String PASSWORD = "password";

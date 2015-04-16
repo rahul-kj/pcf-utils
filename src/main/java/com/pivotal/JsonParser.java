@@ -33,31 +33,13 @@ public class JsonParser {
 
 		JsonObject obj = rdr.readObject();
 
-		String infrastructure_type = obj.getJsonObject(ApplicationConstant.INFRASTRUTURE).getString(
-				ApplicationConstant.TYPE);
-
-		if (infrastructure_type.equalsIgnoreCase(CloudEnv.VCLOUD.getValue())) {
-			details = vCloudEnv(fieldName, jobType, username, details, obj);
-		} else if (infrastructure_type.equalsIgnoreCase(CloudEnv.VSPHERE.getValue())) {
-			details = vsphereEnv(fieldName, jobType, username, details, obj);
-		}
+		details = getDetails(fieldName, jobType, username, details, obj);
 
 		return details;
 	}
 
-	private String vsphereEnv(String fieldName, String jobType, String username, String details, JsonObject obj) {
+	private String getDetails(String fieldName, String jobType, String username, String details, JsonObject obj) {
 		JsonArray jsonArray = obj.getJsonArray(ApplicationConstant.PRODUCTS);
-
-		details = getInfo(fieldName, jobType, username, details, jsonArray);
-		return details;
-	}
-
-	private String vCloudEnv(String fieldName, String jobType, String username, String details, JsonObject obj) {
-		JsonArray jsonArray = obj.getJsonArray(ApplicationConstant.COMPONENTS);
-
-		if (fieldName.equalsIgnoreCase(ApplicationConstant.MICROBOSH)) {
-			fieldName = ApplicationConstant.MICROBOSH_VCLOUD;
-		}
 
 		details = getInfo(fieldName, jobType, username, details, jsonArray);
 		return details;
