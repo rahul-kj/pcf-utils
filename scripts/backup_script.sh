@@ -259,10 +259,11 @@ execute() {
 	zip_all_together
 }
 
-if [ $# -lt 5 ]; then
-	echo "Usage: ./backup_script.sh <OPS MGR HOST or IP> <SSH PASSWORD> <OPS MGR ADMIN USER> <OPS MGR ADMIN PASSWORD> <OUTPUT DIR> <COMPLETE BACKUP>"
+if [ $# -lt 6 ]; then
+	echo "Usage: ./backup_script.sh <OPS MGR HOST or IP> <SSH USER> <SSH PASSWORD> <OPS MGR ADMIN USER> <OPS MGR ADMIN PASSWORD> <OUTPUT DIR> <COMPLETE BACKUP>"
 	printf "\t %s \t\t\t %s \n" "OPS MGR HOST or IP:" "OPS Manager Host or IP"
-	printf "\t %s \t\t\t\t %s \n" "SSH PASSWORD:" "OPS Manager Tempest SSH Password"
+	printf "\t %s \t\t\t\t %s \n" "SSH USER:" "OPS Manager SSH Username"
+	printf "\t %s \t\t\t\t %s \n" "SSH PASSWORD:" "OPS Manager SSH Password"
 	printf "\t %s \t\t\t %s \n" "OPS MGR ADMIN USER:" "OPS Manager Admin Username"
 	printf "\t %s \t\t %s \n" "OPS MGR ADMIN PASSWORD:" "OPS Manager Admin Password"
 	printf "\t %s \t\t\t\t %s \n" "OUTPUT DIR:" "Backup Directory"
@@ -272,16 +273,17 @@ fi
 
 export DATE=`date +%Y_%m_%d`
 export OPS_MANAGER_HOST=$1
-export OPS_MGR_SSH_PASSWORD=$2
-export OPS_MGR_ADMIN_USERNAME=$3
-export OPS_MGR_ADMIN_PASSWORD=$4
+export SSH_USER=$2
+export OPS_MGR_SSH_PASSWORD=$3
+export OPS_MGR_ADMIN_USERNAME=$4
+export OPS_MGR_ADMIN_PASSWORD=$5
 export BACKUP_DIR_NAME=Backup_$DATE
-export WORK_DIR=$5/$BACKUP_DIR_NAME
+export WORK_DIR=$6/$BACKUP_DIR_NAME
 export NFS_DIR=$WORK_DIR/nfs_share
 export DEPLOYMENT_DIR=$WORK_DIR/deployments
 export DATABASE_DIR=$WORK_DIR/database
 
-export COMPLETE_BACKUP=$6
+export COMPLETE_BACKUP=$7
 
 mkdir -p $WORK_DIR
 mkdir -p $NFS_DIR

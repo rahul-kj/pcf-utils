@@ -6,7 +6,7 @@ copy_deployment_files() {
 	/usr/bin/expect -c "
 		set timeout -1
 
-		spawn scp tempest@$OPS_MANAGER_HOST:/var/tempest/workspaces/default/deployments/*.yml $DEPLOYMENT_DIR
+		spawn scp $SSH_USER@$OPS_MANAGER_HOST:/var/tempest/workspaces/default/deployments/*.yml $DEPLOYMENT_DIR
 
 		expect {
 			-re ".*Are.*.*yes.*no.*" {
@@ -32,7 +32,7 @@ copy_deployment_files() {
 	/usr/bin/expect -c "
 		set timeout -1
 
-		spawn scp tempest@$OPS_MANAGER_HOST:/var/tempest/workspaces/default/deployments/micro/*.yml $DEPLOYMENT_DIR
+		spawn scp $SSH_USER@$OPS_MANAGER_HOST:/var/tempest/workspaces/default/deployments/micro/*.yml $DEPLOYMENT_DIR
 
 		expect {
 			-re ".*Are.*.*yes.*no.*" {
