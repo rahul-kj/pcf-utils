@@ -27,32 +27,6 @@ copy_deployment_files() {
 
 		exit
 	"
-
-	echo "COPY MICRO-BOSH DEPLOYMENT MANIFEST"
-	/usr/bin/expect -c "
-		set timeout -1
-
-		spawn scp $SSH_USER@$OPS_MANAGER_HOST:/var/tempest/workspaces/default/deployments/micro/*.yml $DEPLOYMENT_DIR
-
-		expect {
-			-re ".*Are.*.*yes.*no.*" {
-				send yes\r ;
-				exp_continue
-			}
-
-			"*?assword:*" {
-				send $OPS_MGR_SSH_PASSWORD\r
-			}
-		}
-		expect {
-			"*?assword:*" {
-				send $OPS_MGR_SSH_PASSWORD\r
-				interact
-			}
-		}
-
-		exit
-	"
 }
 
 export_installation_settings() {

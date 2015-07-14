@@ -86,20 +86,7 @@ stop_cloud_controller() {
 		JOB=`echo $word | cut -d '/' -f 1`
 		INDEX=`echo $word | cut -d '/' -f 2`
 
-		/usr/bin/expect -c "
-			set timeout -1
-
-			spawn bosh stop $JOB $INDEX
-
-			expect {
-				-re ".*continue.*" {
-					send yes\r ;
-					interact
-				}
-			}
-
-			exit
-		"
+		bosh -n stop $JOB $INDEX --force
 	done
 }
 
@@ -182,20 +169,7 @@ start_cloud_controller() {
 		JOB=`echo $word | cut -d '/' -f 1`
 		INDEX=`echo $word | cut -d '/' -f 2`
 
-		/usr/bin/expect -c "
-			set timeout -1
-
-			spawn bosh start $JOB $INDEX
-
-			expect {
-				-re ".*continue.*" {
-					send yes\r ;
-					interact
-				}
-			}
-
-			exit
-		"
+		bosh -n start $JOB $INDEX --force
 	done
 
 }
@@ -259,31 +233,37 @@ execute() {
 	zip_all_together
 }
 
-if [ $# -lt 6 ]; then
-	echo "Usage: ./backup_script.sh <OPS MGR HOST or IP> <SSH USER> <SSH PASSWORD> <OPS MGR ADMIN USER> <OPS MGR ADMIN PASSWORD> <OUTPUT DIR> <COMPLETE BACKUP>"
-	printf "\t %s \t\t\t %s \n" "OPS MGR HOST or IP:" "OPS Manager Host or IP"
-	printf "\t %s \t\t\t\t %s \n" "SSH USER:" "OPS Manager SSH Username"
-	printf "\t %s \t\t\t\t %s \n" "SSH PASSWORD:" "OPS Manager SSH Password"
-	printf "\t %s \t\t\t %s \n" "OPS MGR ADMIN USER:" "OPS Manager Admin Username"
-	printf "\t %s \t\t %s \n" "OPS MGR ADMIN PASSWORD:" "OPS Manager Admin Password"
-	printf "\t %s \t\t\t\t %s \n" "OUTPUT DIR:" "Backup Directory"
-	printf "\t %s \t\t\t %s \n" "COMPLETE BACKUP:" "Specify 'Y' for complete backup"
-	exit 1
+if [[ ! -f "./environment.sh" ]]; then
+
+	if [ $# -lt 6 ]; then
+		echo "Usage: ./backup_script.sh <OPS MGR HOST or IP> <SSH USER> <SSH PASSWORD> <OPS MGR ADMIN USER> <OPS MGR ADMIN PASSWORD> <OUTPUT DIR> <COMPLETE BACKUP>"
+		printf "\t %s \t\t\t %s \n" "OPS MGR HOST or IP:" "OPS Manager Host or IP"
+		printf "\t %s \t\t\t\t %s \n" "SSH USER:" "OPS Manager SSH Username"
+		printf "\t %s \t\t\t\t %s \n" "SSH PASSWORD:" "OPS Manager SSH Password"
+		printf "\t %s \t\t\t %s \n" "OPS MGR ADMIN USER:" "OPS Manager Admin Username"
+		printf "\t %s \t\t %s \n" "OPS MGR ADMIN PASSWORD:" "OPS Manager Admin Password"
+		printf "\t %s \t\t\t\t %s \n" "OUTPUT DIR:" "Backup Directory"
+		printf "\t %s \t\t\t %s \n" "COMPLETE BACKUP:" "Specify 'Y' for complete backup"
+		exit 1
+	fi
+
+	export DATE=`date +%Y_%m_%d`
+	export OPS_MANAGER_HOST=$1
+	export SSH_USER=$2
+	export OPS_MGR_SSH_PASSWORD=$3
+	export OPS_MGR_ADMIN_USERNAME=$4
+	export OPS_MGR_ADMIN_PASSWORD=$5
+	export BACKUP_DIR_NAME=Backup_$DATE
+	export WORK_DIR=$6/$BACKUP_DIR_NAME
+	export NFS_DIR=$WORK_DIR/nfs_share
+	export DEPLOYMENT_DIR=$WORK_DIR/deployments
+	export DATABASE_DIR=$WORK_DIR/database
+
+	export COMPLETE_BACKUP=$7
+
+else
+	source "./environment.sh"
 fi
-
-export DATE=`date +%Y_%m_%d`
-export OPS_MANAGER_HOST=$1
-export SSH_USER=$2
-export OPS_MGR_SSH_PASSWORD=$3
-export OPS_MGR_ADMIN_USERNAME=$4
-export OPS_MGR_ADMIN_PASSWORD=$5
-export BACKUP_DIR_NAME=Backup_$DATE
-export WORK_DIR=$6/$BACKUP_DIR_NAME
-export NFS_DIR=$WORK_DIR/nfs_share
-export DEPLOYMENT_DIR=$WORK_DIR/deployments
-export DATABASE_DIR=$WORK_DIR/database
-
-export COMPLETE_BACKUP=$7
 
 mkdir -p $WORK_DIR
 mkdir -p $NFS_DIR
