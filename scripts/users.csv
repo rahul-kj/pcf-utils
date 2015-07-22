@@ -1,3 +1,1 @@
-uid=username, email@example.com, ORGNAME, OrgManager|OrgAuditor, SPACENAME, SpaceManager|SpaceDeveloper|SpaceAuditor
-uid=username, email@example.com, ORGNAME, , SPACENAME, SpaceManager|SpaceDeveloper|SpaceAuditor
-uid=username, email@example.com, ORGNAME, , SPACENAME, SpaceManager|SpaceDeveloper|SpaceAuditor
+LDAP EXTERNAL ID#EMAIL ADDRESS#USERNAME#ORGNAME#OrgManager|OrgAuditor#SPACENAME#SpaceManager|SpaceDeveloper|SpaceAuditor
