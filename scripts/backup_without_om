@@ -1,6 +1,6 @@
 #!/bin/bash --login
 
-. common.sh
+. common
 
 validate_software() {
 	echo "VALIDATE MANDATORY TOOLS"
@@ -11,11 +11,11 @@ validate_software() {
 		exit 1
 	fi
 
-	INSTALLED_PG_DUMP=`which pg_dump`
-	if [ -z "$INSTALLED_PG_DUMP" ]; then
-		echo "pg_dump utility not installed"
-		exit 1
-	fi
+#	INSTALLED_PG_DUMP=`which pg_dump`
+#	if [ -z "$INSTALLED_PG_DUMP" ]; then
+#		echo "pg_dump utility not installed"
+#		exit 1
+#	fi
 
 	INSTALLED_JAVA=`which java`
 	if [ -z "$INSTALLED_JAVA" ]; then
@@ -73,7 +73,7 @@ set_bosh_deployment() {
 
 export_bosh_vms() {
     echo "EXPORT BOSH VMS"
-	OUTPUT=`bosh vms | grep "cloud_controller-*" | cut -d '|' -f 2 | tr -d ' '`
+	OUTPUT=`bosh vms | grep "cloud_controller-partition-*" | cut -d '|' -f 2 | cut -d '(' -f 1 | tr -d ' '`
 	echo $OUTPUT > $WORK_DIR/bosh-vms.txt
 }
 
@@ -88,26 +88,6 @@ stop_cloud_controller() {
 
 		bosh -n stop $JOB $INDEX --force
 	done
-}
-
-export_cc_db() {
-	echo "EXPORT CCDB"
-
-	export_db cf ccdb admin 2544 "ccdb" $DATABASE_DIR/ccdb.sql
-
-}
-
-export_uaadb() {
-	echo "EXPORT UAA-DB"
-
-	export_db cf uaadb root 2544 "uaa" $DATABASE_DIR/uaadb.sql
-
-}
-
-export_consoledb() {
-	echo "EXPORT CONSOLE-DB"
-
-	export_db cf consoledb root 2544 "console" $DATABASE_DIR/console.sql
 }
 
 export_db() {
@@ -128,30 +108,18 @@ export_db() {
 export_nfs_server() {
 	echo "EXPORT NFS-SERVER"
 
-	output=`sh appassembler/bin/app $WORK_DIR/installation.yml cf nfs_server vcap`
+	NFS_IP=`bosh vms $CF_DEPLOYMENT_NAME | grep nfs | cut -d '|' -f 6 | tr -d ' '`
 
-	export NFS_SERVER_USER=`echo $output | cut -d '|' -f 1`
-	export NFS_SERVER_PASSWORD=`echo $output | cut -d '|' -f 2`
-	export NFS_IP=`echo $output | cut -d '|' -f 3`
+	ssh-keygen -R $NFS_IP
 
 	/usr/bin/expect -c "
 		set timeout -1
 
-		spawn scp -rp $NFS_SERVER_USER@$NFS_IP:/var/vcap/store/shared $NFS_DIR
+		spawn scp -i $BOSH_PRIVATE_KEY_PATH -rp vcap@$NFS_IP:/var/vcap/store/shared $NFS_DIR
 
 		expect {
 			-re ".*Are.*.*yes.*no.*" {
 				send yes\r ;
-				exp_continue
-			}
-
-			"*?assword:*" {
-				send $NFS_SERVER_PASSWORD\r
-			}
-		}
-		expect {
-			"*?assword:*" {
-				send $NFS_SERVER_PASSWORD\r
 				interact
 			}
 		}
@@ -175,21 +143,22 @@ start_cloud_controller() {
 }
 
 export_mysqldb() {
-	output=`sh appassembler/bin/app $WORK_DIR/installation.yml cf mysql root`
 
-	export USERNAME=`echo $output | cut -d '|' -f 1`
-	export PASSWORD=`echo $output | cut -d '|' -f 2`
-	export IP=`echo $output | cut -d '|' -f 3`
+	export USERNAME='root'
+	export PASSWORD=`cat $WORK_DIR/$CF_DEPLOYMENT_FILE_NAME | grep "user=root --password=" | tr -s ' ' | cut -d '=' -f 3 | cut -d ' ' -f 1`
+	export IP=`bosh vms $CF_DEPLOYMENT_NAME | grep mysql-partition* | cut -d '|' -f 6 | tr -d ' '`
 
-	DB_FILE=$DATABASE_DIR/user_databases.sql
+	DB_FILE=$DATABASE_DIR/mysql.sql
 
-	echo '[mysqldump]
-user='$USERNAME'
-password='$PASSWORD > ~/.my.cnf
+	echo "[mysqldump]
+user=$USERNAME
+password=$PASSWORD" > ~/.my.cnf
 
 	echo "EXPORT MySQL DB"
 
 	mysqldump -u $USERNAME -h $IP --all-databases > $DB_FILE
+
+  rm ~/.my.cnf
 
 }
 
@@ -213,53 +182,45 @@ zip_all_together() {
 
 execute() {
 	validate_software
-	copy_deployment_files
-	export_installation_settings
-	fetch_bosh_connection_parameters
-	bosh_login
+	bosh_login_wo_certs
 	verify_deployment_backedUp
 	export_Encryption_key
 	bosh_status
 	set_bosh_deployment
 	export_bosh_vms
 	stop_cloud_controller
-	export_cc_db
-	export_uaadb
-	export_consoledb
 	export_nfs_server
 	export_mysqldb
 	start_cloud_controller
-	export_installation
 	zip_all_together
+	bosh logout
 }
 
 if [[ ! -f "./environment.sh" ]]; then
 
-	if [ $# -lt 6 ]; then
-		echo "Usage: ./backup_script.sh <OPS MGR HOST or IP> <SSH USER> <SSH PASSWORD> <OPS MGR ADMIN USER> <OPS MGR ADMIN PASSWORD> <OUTPUT DIR> <COMPLETE BACKUP>"
-		printf "\t %s \t\t\t %s \n" "OPS MGR HOST or IP:" "OPS Manager Host or IP"
-		printf "\t %s \t\t\t\t %s \n" "SSH USER:" "OPS Manager SSH Username"
-		printf "\t %s \t\t\t\t %s \n" "SSH PASSWORD:" "OPS Manager SSH Password"
-		printf "\t %s \t\t\t %s \n" "OPS MGR ADMIN USER:" "OPS Manager Admin Username"
-		printf "\t %s \t\t %s \n" "OPS MGR ADMIN PASSWORD:" "OPS Manager Admin Password"
+	if [ $# -lt 5 ]; then
+		echo "Usage: ./backup_script.sh <BOSH DIRECTOR IP> <BOSH DIRECTOR USER> <BOSH DIRECTOR PASSWORD> <BOSH PRIVATE KEY PATH> <OUTPUT DIR> <COMPLETE BACKUP>"
+		printf "\t %s \t\t\t %s \n" "BOSH DIRECTOR IP:" "Bosh Director IP"
+		printf "\t %s \t\t\t %s \n" "BOSH DIRECTOR USER:" "BOSH Director Username"
+		printf "\t %s \t\t %s \n" "BOSH DIRECTOR PASSWORD:" "BOSH Director Password"
+    printf "\t %s \t\t %s \n" "BOSH PRIVATE KEY PATH:" "BOSH Private Key Location"
 		printf "\t %s \t\t\t\t %s \n" "OUTPUT DIR:" "Backup Directory"
 		printf "\t %s \t\t\t %s \n" "COMPLETE BACKUP:" "Specify 'Y' for complete backup"
 		exit 1
 	fi
 
 	export DATE=`date +%Y_%m_%d`
-	export OPS_MANAGER_HOST=$1
-	export SSH_USER=$2
-	export OPS_MGR_SSH_PASSWORD=$3
-	export OPS_MGR_ADMIN_USERNAME=$4
-	export OPS_MGR_ADMIN_PASSWORD=$5
+  export BOSH_DIRECTOR_IP=$1
+	export DIRECTOR_USERNAME=$2
+  export DIRECTOR_PASSWORD=$3
+  export BOSH_PRIVATE_KEY_PATH=$4
 	export BACKUP_DIR_NAME=Backup_$DATE
-	export WORK_DIR=$6/$BACKUP_DIR_NAME
+	export WORK_DIR=$5/$BACKUP_DIR_NAME
 	export NFS_DIR=$WORK_DIR/nfs_share
 	export DEPLOYMENT_DIR=$WORK_DIR/deployments
 	export DATABASE_DIR=$WORK_DIR/database
 
-	export COMPLETE_BACKUP=$7
+	export COMPLETE_BACKUP='N' #$5
 
 else
 	source "./environment.sh"

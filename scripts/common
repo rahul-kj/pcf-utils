@@ -1,0 +1,132 @@
+#!/bin/bash --login
+
+login_opsman() {
+
+	echo "remove the old uaa authentication tokens"
+	rm ~/.uaac.yml
+
+	echo "LOGIN TO OPSMAN"
+
+	uaac target https://$OPS_MANAGER_HOST/uaa --skip-ssl-validation
+
+	uaac token owner get opsman $OPS_MGR_ADMIN_USERNAME -s "" -p $OPS_MGR_ADMIN_PASSWORD
+
+}
+
+scp_files() {
+
+	ssh-keygen -R $OPS_MANAGER_HOST
+
+	echo "COPY DEPLOYMENT MANIFEST"
+	ssh-keygen -R $OPS_MANAGER_HOST
+
+	/usr/bin/expect -c "
+		set timeout -1
+
+		spawn scp $SSH_USER@$OPS_MANAGER_HOST:$1 $2
+
+		expect {
+			-re ".*Are.*.*yes.*no.*" {
+				send yes\r ;
+				exp_continue
+			}
+
+			"*?assword:*" {
+				send $OPS_MGR_SSH_PASSWORD\r
+			}
+		}
+		expect {
+			"*?assword:*" {
+				send $OPS_MGR_SSH_PASSWORD\r
+				interact
+			}
+		}
+
+		exit
+	"
+}
+
+export_installation_settings() {
+	CONNECTION_URL=https://$OPS_MANAGER_HOST/api/installation_settings
+
+	echo "EXPORT INSTALLATION FILES FROM " $CONNECTION_URL
+
+	export UAA_ACCESS_TOKEN=`cat ~/.uaac.yml | grep "access_token:" | cut -d':' -f2 | cut -d' ' -f2`
+
+	curl "$CONNECTION_URL" -X GET -k -H "Authorization: Bearer $UAA_ACCESS_TOKEN" -o $WORK_DIR/installation.yml
+
+	BOSH_MANIFEST_URL=https://$OPS_MANAGER_HOST/api/v0/staged/director/manifest
+
+	curl "$BOSH_MANIFEST_URL" -X GET -k -H "Authorization: Bearer $UAA_ACCESS_TOKEN" -o $DEPLOYMENT_DIR/bosh.yml
+
+}
+
+fetch_bosh_connection_parameters() {
+	echo "GATHER BOSH DIRECTOR CONNECTION PARAMETERS"
+
+	output=`sh appassembler/bin/app $WORK_DIR/installation.yml p-bosh director director`
+
+	export DIRECTOR_USERNAME=`echo $output | cut -d '|' -f 1`
+	export DIRECTOR_PASSWORD=`echo $output | cut -d '|' -f 2`
+	export BOSH_DIRECTOR_IP=`echo $output | cut -d '|' -f 3`
+
+}
+
+bosh_login() {
+	echo "BOSH LOGIN"
+	rm -rf ~/.bosh_config
+
+	echo director IP is $BOSH_DIRECTOR_IP
+
+	/usr/bin/expect -c "
+		set timeout -1
+
+		spawn bosh --ca-cert $CA_CERT_LOCATION target $BOSH_DIRECTOR_IP
+
+		expect {
+			-re ".*Email:*" {
+				send $DIRECTOR_USERNAME\r ;
+				exp_continue
+			}
+
+			"*?assword:*" {
+				send $DIRECTOR_PASSWORD\r
+				interact
+			}
+		}
+
+		exit
+	"
+}
+
+bosh_login_wo_certs() {
+	echo "BOSH LOGIN"
+	rm -rf ~/.bosh_config
+
+	echo director IP is $BOSH_DIRECTOR_IP
+
+	/usr/bin/expect -c "
+		set timeout -1
+
+		spawn bosh target $BOSH_DIRECTOR_IP
+
+		expect {
+			-re ".*username:*" {
+				send $DIRECTOR_USERNAME\r ;
+				exp_continue
+			}
+
+			"*?assword:*" {
+				send $DIRECTOR_PASSWORD\r
+				interact
+			}
+		}
+
+		exit
+	"
+}
+
+logout_all() {
+	bosh logout
+	uaac token delete $OPS_MGR_ADMIN_USERNAME
+}
