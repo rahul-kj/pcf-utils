@@ -1,4 +1,4 @@
-#!/bin/bash --login
+#!/bin/bash -e
 
 login_opsman() {
 
@@ -129,4 +129,15 @@ bosh_login_wo_certs() {
 logout_all() {
 	bosh logout
 	uaac token delete $OPS_MGR_ADMIN_USERNAME
+}
+
+function fetch_cf_deployment_guid() {
+	export PRODUCT_GUID=`om -t https://$OPS_MANAGER_HOST -u $OPS_MGR_ADMIN_USERNAME -p $OPS_MGR_ADMIN_PASSWORD -k curl -p "/api/v0/deployed/products" | jq '.[] | select ( .type | contains("cf")) | .guid' | tr -d '"'`
+	echo $PRODUCT_GUID
+}
+
+function fetch_credentials() {
+	CURL_URL=/api/v0/deployed/products/$PRODUCT_GUID/credentials/$1
+	RESPONSE=`om -t https://$OPS_MANAGER_HOST -u $OPS_MGR_ADMIN_USERNAME -p $OPS_MGR_ADMIN_PASSWORD -k curl -p "$CURL_URL"`
+  echo $RESPONSE
 }

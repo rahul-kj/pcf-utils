@@ -1,26 +1,42 @@
-#!/bin/bash
+#!/bin/bash -e
 
-# 1. UAA url
-# 2. Admin username
-# 3. Admin secret
-# 4. User to promote as admin
+# 1. User to promote as admin
 
-if [ $# -lt 4 ]; then
-  echo "Usage: ./assign-admin-privileges <System Domain> <admin username> <admin-secret> <user-to-promote>"
-  exit 1
+if [[ ! -f "./environment" ]]; then
+  if [ $# -lt 5 ]; then
+    echo "Usage: ./assign-admin-privileges <System Domain> <Ops Manager Host> <Ops Manager Username> <Ops Manager Password> <user-to-promote>"
+    exit 1
+  fi
+
+  export SYSTEM_DOMAIN=$1
+  export OPS_MANAGER_HOST=$2
+  export OPS_MGR_ADMIN_USERNAME=$3
+  export OPS_MGR_ADMIN_PASSWORD=$4
+  export USER_TO_PROMOTE=$5
+else
+  source environment
+  
+  if [ $# -lt 1 ]; then
+    echo "Usage: ./assign-admin-privileges <user-to-promote>"
+    exit 1
+  fi
+  export USER_TO_PROMOTE=$1
 fi
 
+. common
+
 export LOG_FILE=/tmp/assign-admin-privileges.log
-export SYSTEM_DOMAIN=$1
 export UAA_ENDPOINT=uaa.$SYSTEM_DOMAIN
-export UAA_ADMIN_USER=$2
-export UAA_ADMIN_PWD=$3
-export USER_TO_PROMOTE=$4
 
 echo "Log location is: $LOG_FILE"
 
+fetch_cf_deployment_guid
+RESPONSE=$(fetch_credentials .uaa.admin_client_credentials)
+UAA_ADMIN_USERNAME=`echo $RESPONSE | jq '.credential.value.identity' | tr -d '"'`
+UAA_ADMIN_PASSWORD=`echo $RESPONSE | jq '.credential.value.password' | tr -d '"'`
+
 uaac target $UAA_ENDPOINT >> /tmp/assign-admin-privileges.log 2>&1
-uaac token client get $UAA_ADMIN_USER -s $UAA_ADMIN_PWD >> $LOG_FILE 2>&1
+uaac token client get $UAA_ADMIN_USERNAME -s $UAA_ADMIN_PASSWORD >> $LOG_FILE 2>&1
 uaac contexts >> $LOG_FILE 2>&1
 
 uaac member add cloud_controller.admin $USER_TO_PROMOTE >> $LOG_FILE 2>&1

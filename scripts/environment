@@ -1,7 +1,6 @@
 #!/bin/bash
 
-export SYSTEM_DOMAIN=
-export APPS_MGR_ADMIN_USER=
-export APPS_MGR_ADMIN_PWD=
-export UAA_ADMIN_USER=
-export UAA_ADMIN_PWD=
+export SYSTEM_DOMAIN=sys.homelab.io
+export OPS_MANAGER_HOST=opsmgr.homelab.io
+export OPS_MGR_ADMIN_USERNAME=admin
+export OPS_MGR_ADMIN_PASSWORD=welcome

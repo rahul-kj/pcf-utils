@@ -1,14 +1,30 @@
-#!/bin/bash
+#!/bin/bash -e
 
 echo "Pre-requisities"
 echo "Install the following cli's"
 echo "cf cli (download from apps manager)"
 echo "uaa cli (gem install cf-uaac)"
-echo
+echo "om cli (download from github)"
+echo ""
 
-source environment
+. common
 
-if [[ ! -f "./environment.sh" ]]; then
+if [[ ! -f "./environment" ]]; then
+  if [ $# -lt 7 ]; then
+    echo "Usage: ./import-single-user <System Domain> <Ops Manager Host> <Ops Manager Username> <Ops Manager Password> <External User ID> <User Email> <Username>"
+    exit 1
+  fi
+
+  export SYSTEM_DOMAIN=$1
+  export OPS_MANAGER_HOST=$2
+  export OPS_MGR_ADMIN_USERNAME=$3
+  export OPS_MGR_ADMIN_PASSWORD=$4
+  export USER_UID=$5
+  export USER_EMAIL=$6
+  export LOGIN_USERNAME=$7
+else
+  source environment
+
   if [ $# -lt 3 ]; then
     echo "Usage: ./import-single-user <External User ID> <User Email> <Username>"
     exit 1
@@ -16,7 +32,7 @@ if [[ ! -f "./environment.sh" ]]; then
 
   export USER_UID=$1
   export USER_EMAIL=$2
-  export USERNAME=$3
+  export LOGIN_USERNAME=$3
 fi
 
 export API_ENDPOINT=api.$SYSTEM_DOMAIN
@@ -25,17 +41,29 @@ export UAA_ENDPOINT=uaa.$SYSTEM_DOMAIN
 export LOG_FILE=/tmp/import-users.log
 echo "Log location is: $LOG_FILE"
 
-cf api --skip-ssl-validation $API_ENDPOINT >> $LOG_FILE 2>&1
-cf login -u $APPS_MGR_ADMIN_USER -p $APPS_MGR_ADMIN_PWD -o system -s system
+fetch_cf_deployment_guid
+RESPONSE=$(fetch_credentials .uaa.admin_credentials)
+CF_ADMIN_USERNAME=`echo $RESPONSE | jq '.credential.value.identity' | tr -d '"'`
+CF_ADMIN_PASSWORD=`echo $RESPONSE | jq '.credential.value.password' | tr -d '"'`
 
+echo "User and password " $CF_ADMIN_USERNAME $CF_ADMIN_PASSWORD
+
+cf api --skip-ssl-validation $API_ENDPOINT >> $LOG_FILE 2>&1
+cf login -u $CF_ADMIN_USERNAME -p $CF_ADMIN_PASSWORD -o system -s system
+
+RESPONSE=$(fetch_credentials .uaa.admin_client_credentials)
+UAA_ADMIN_USERNAME=`echo $RESPONSE | jq '.credential.value.identity' | tr -d '"'`
+UAA_ADMIN_PASSWORD=`echo $RESPONSE | jq '.credential.value.password' | tr -d '"'`
+
+echo "User and password " $UAA_ADMIN_USERNAME $UAA_ADMIN_PASSWORD
 uaac target --skip-ssl-validation $UAA_ENDPOINT >> $LOG_FILE 2>&1
-uaac token client get $UAA_ADMIN_USER -s $UAA_ADMIN_PWD >> $LOG_FILE 2>&1
+uaac token client get $UAA_ADMIN_USERNAME -s $UAA_ADMIN_PASSWORD >> $LOG_FILE 2>&1
 
 echo "External LDAP ID is         : $USER_UID"
 echo "Email is                    : $USER_EMAIL"
-echo "UserName is                 : $USERNAME"
+echo "UserName is                 : $LOGIN_USERNAME"
 
-RESPONSE=`uaac curl -H "Content-Type: application/json" -k  /Users -X POST -d '{"userName":"'"$USERNAME"'","emails":[{"value":"'"$USER_EMAIL"'"}],"origin":"ldap","externalId":"'"$USER_UID"'"}'`
+RESPONSE=`uaac curl -H "Content-Type: application/json" -k  /Users -X POST -d '{"userName":"'"$LOGIN_USERNAME"'","emails":[{"value":"'"$USER_EMAIL"'"}],"origin":"ldap","externalId":"'"$USER_UID"'"}'`
 ID=`echo $RESPONSE | grep "id" | head -3 | tail -1 | cut -d ":" -f2 | cut -d " " -f2 | cut -d "," -f1`
 echo $ID
 

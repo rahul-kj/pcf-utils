@@ -1,49 +1,42 @@
-#!/bin/bash
+#!/bin/bash -e
 
-if [ $# -lt 4 ]; then
-  echo "Usage: ./add-org-spaces <System Domain> <Apps Manager Admin Username> <Apps Manager Admin Password> <Environment>"
-  exit 1
-fi
+. common
 
-export SYSTEM_DOMAIN=$1
-export API_ENDPOINT=api.$SYSTEM_DOMAIN
-export APPS_MGR_ADMIN_USER=$2
-export APPS_MGR_ADMIN_PWD=$3
-export ENVIRONMENT=$4
+if [[ ! -f "./environment" ]]; then
+  if [ $# -lt 6 ]; then
+    echo "Usage: ./add-org-spaces <System Domain> <Ops Manager Host> <Ops Manager Username> <Ops Manager Password> <Org> <Space>"
+    exit 1
+  fi
 
-if [[ $ENVIRONMENT = "dev" ]]; then
-  cf api --skip-ssl-validation $API_ENDPOINT
-  cf login -u $APPS_MGR_ADMIN_USER -p $APPS_MGR_ADMIN_PWD
-
-  cf co DEVELOPMENT
-  cf create-space development -o DEVELOPMENT
-
-  cf logout
-elif [[ $ENVIRONMENT = "int" ]]; then
-  cf api --skip-ssl-validation $API_ENDPOINT
-  cf login -u $APPS_MGR_ADMIN_USER -p $APPS_MGR_ADMIN_PWD
-
-  cf co INTEGRATION
-  cf create-space integration -o INTEGRATION
-
-  cf logout
-elif [[ $ENVIRONMENT = "test" ]]; then
-  cf api --skip-ssl-validation $API_ENDPOINT
-  cf login -u $APPS_MGR_ADMIN_USER -p $APPS_MGR_ADMIN_PWD
-
-  cf co TEST
-  cf create-space test -o TEST
-
-  cf logout
-elif [[ $ENVIRONMENT = "prod" ]]; then
-  cf api --skip-ssl-validation $API_ENDPOINT
-  cf login -u $APPS_MGR_ADMIN_USER -p $APPS_MGR_ADMIN_PWD
-
-  cf co PRODUCTION
-  cf create-space production -o PRODUCTION
-
-  cf logout
+  export SYSTEM_DOMAIN=$1
+  export OPS_MANAGER_HOST=$2
+  export OPS_MGR_ADMIN_USERNAME=$3
+  export OPS_MGR_ADMIN_PASSWORD=$4
+  export ORG=$5
+  export SPACE=$6
 else
-  echo "Unsupported platform"
-  exit 1
+  source environment
+
+  if [ $# -lt 2 ]; then
+    echo "Usage: ./add-org-spaces <Org> <Space>"
+    exit 1
+  fi
+
+  export ORG=$1
+  export SPACE=$2
 fi
+
+export API_ENDPOINT=api.$SYSTEM_DOMAIN
+
+fetch_cf_deployment_guid
+RESPONSE=$(fetch_credentials .uaa.admin_credentials)
+CF_ADMIN_USERNAME=`echo $RESPONSE | jq '.credential.value.identity' | tr -d '"'`
+CF_ADMIN_PASSWORD=`echo $RESPONSE | jq '.credential.value.password' | tr -d '"'`
+
+cf api --skip-ssl-validation $API_ENDPOINT
+cf login -u $CF_ADMIN_USERNAME -p $CF_ADMIN_PASSWORD -o system -s system
+
+cf co $ORG
+cf create-space $SPACE -o $ORG
+
+cf logout
